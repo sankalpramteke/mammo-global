@@ -3,6 +3,7 @@ import mongoose, { Schema } from 'mongoose';
 const HospitalSchema = new Schema({
   name:       { type: String, required: true },
   hospitalId: { type: String, required: true, unique: true },
+  password:   { type: String }, // Optional field for portal login
   location:   { type: String, default: '' },
   lat:        { type: Number, default: 20.5937 },
   lng:        { type: Number, default: 78.9629 },

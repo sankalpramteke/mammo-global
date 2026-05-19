@@ -5,6 +5,12 @@ const RoundSchema = new Schema({
   accuracy:          { type: Number, required: true },
   participants:      { type: Number, default: 0 },
   hospitalIds:       [{ type: String }],
+  contributions:     [{
+    hospitalId:   { type: String },
+    hospitalName: { type: String },
+    sampleCount:  { type: Number },
+    weightsHash:  { type: String }
+  }],
   modelVersion:      { type: String, default: 'ResNet50-v1.0' },
   weightsPath:       { type: String, default: '' },
   sampleCount:       { type: Number, default: 0 },

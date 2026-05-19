@@ -1,29 +1,39 @@
 import { NextRequest, NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import { randomUUID } from 'crypto';
 import { connectDB } from '@/lib/mongoose';
 import Admin from '@/models/Admin';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'mammo_global_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 export async function POST(req: NextRequest) {
-  await connectDB();
-  const { email, password } = await req.json();
+  if (!JWT_SECRET) {
+    console.error('JWT_SECRET environment variable is not set');
+    return NextResponse.json({ error: 'Server configuration error' }, { status: 500 });
+  }
 
-  if (!email || !password)
+  await connectDB();
+
+  const body = await req.json().catch(() => null);
+  if (!body?.email || !body?.password)
     return NextResponse.json({ error: 'Email and password required' }, { status: 400 });
 
-  // Auto-create admin on first login if none exists
-  let admin = await Admin.findOne({ email });
-  if (!admin) {
-    const hash = await bcrypt.hash(password, 10);
-    admin = await Admin.create({ name: 'Admin', email, password: hash });
-  }
+  const { email, password } = body;
+
+  const admin = await Admin.findOne({ email: email.toLowerCase().trim() });
+  if (!admin)
+    return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
 
   const valid = await bcrypt.compare(password, admin.password);
   if (!valid)
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
 
-  const token = jwt.sign({ adminId: admin._id.toString(), email: admin.email }, JWT_SECRET, { expiresIn: '24h' });
+  const token = jwt.sign(
+    { adminId: admin._id.toString(), email: admin.email, jti: randomUUID() },
+    JWT_SECRET,
+    { expiresIn: '8h' }
+  );
+
   return NextResponse.json({ token, name: admin.name, email: admin.email });
 }

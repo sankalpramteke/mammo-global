@@ -1,154 +1,244 @@
-# mammo-global — Complete In-Depth Guide
+# DISHA — mammo-global
 
-> **Purpose**: The central Federated Learning (FL) aggregator and Global Dashboard. It receives model weight updates from all connected hospital nodes (`mammo-server`), performs FedAvg aggregation to create a new global model, and provides a real-time web dashboard to monitor the network's health and accuracy.
-
----
-
-## 1. Technology Stack
-
-| Technology | Version | Why We Used It |
-|---|---|---|
-| **Next.js** | 14.2 | Full-stack React framework. Used here primarily for the Global Dashboard UI (App Router) and the FL aggregation API routes. |
-| **React** | 18 | Component-based UI for the dashboard (Cards, Charts, Tables). |
-| **TailwindCSS** | 3.4 | Rapid UI styling for the dashboard, using government-themed colors (Navy Blue, Orange). |
-| **MongoDB Atlas** | Cloud | Stores the FL network history. We track `Round` (each global aggregation) and `Hospital` (each connected node). |
-| **Mongoose** | 8.2 | ODM for MongoDB. Defines the strict schemas for FL Rounds and Hospital telemetry. |
-| **chart.js + react-chartjs-2** | 4.4 / 5.2 | Renders the "Model Accuracy Progression" line chart and the "Prediction Distribution" doughnut chart on the dashboard. |
-| **Recharts / react-simple-maps** | (Optional) | Used for rendering the geographic node distribution map of India. |
-| **SWR** | 2.2 | Data fetching library. Used on the dashboard to auto-poll the `/api/stats` endpoint every few seconds for real-time updates without full page reloads. |
+> **Central Federated Learning Coordinator & Admin Dashboard**
+>
+> mammo-global is the cloud-hosted brain of the DISHA platform. It receives encrypted, privacy-preserving model updates from all hospital nodes, aggregates them into a stronger global AI model, and displays real-time network health on a professional admin dashboard — all without ever seeing a single patient image.
 
 ---
 
-## 2. Project Architecture
+## What Does This Do?
 
-```mermaid
-graph TD
-    subgraph "Hospital Nodes (mammo-server)"
-        H1["Node 1 (AIIMS Nagpur)"]
-        H2["Node 2 (GMCH Nagpur)"]
-        H3["Node N (...)"]
-    end
-    
-    subgraph "mammo-global (:3001)"
-        API_FL["/api/fl/receive-weights"]
-        API_H["/api/hospitals"]
-        API_S["/api/stats"]
-        UI["Global Dashboard"]
-    end
-    
-    DB[(MongoDB Atlas)]
-    
-    H1 -->|1. Send Weights| API_FL
-    H2 -->|1. Send Weights| API_FL
-    
-    H1 -->|Heartbeat| API_H
-    H2 -->|Heartbeat| API_H
-    
-    API_FL -->|2. FedAvg Aggregation| API_FL
-    API_FL -->|3. Save Round| DB
-    API_H -->|Update Status| DB
-    
-    UI -->|Poll| API_S
-    API_S -->|Query| DB
+Think of mammo-global as the **coordinator** in a team project. Each hospital (node) does its own work locally, then sends only a summary of what it learned — never the raw data. mammo-global collects these summaries, combines them intelligently, and sends the improved model back. This is **Federated Learning**.
+
+---
+
+## System Architecture
+
 ```
-
-### Key Architectural Decisions
-1. **Centralized Aggregation (Step C)**: Unlike `mammo-client` which is decentralized (one per hospital), `mammo-global` is a single cloud instance. It acts as the "conductor" of the Federated Learning symphony.
-2. **Stateless Aggregation via API**: The aggregation logic runs inside a Next.js API route. When enough weights arrive, it averages them and records a new `Round` in MongoDB.
-3. **No Patient Data**: This server **never** sees patient images, names, or individual predictions. It only receives mathematical model weights and abstract telemetry (accuracy %). This ensures 100% HIPAA/DPDP compliance.
-
----
-
-## 3. Core Features & Federated Learning Flow
-
-Following the Federated Learning pattern, this node is responsible for **Step C**.
-
-### Feature 1: FedAvg Aggregation (Step C)
-- **Endpoint**: `POST /api/fl/receive-weights`
-- **How it works**: 
-  1. Hospital nodes (`mammo-server`) send their locally trained weight deltas here after `POST /train`.
-  2. The global server collects these weights.
-  3. It applies the **Federated Averaging (FedAvg)** algorithm: $W_{t+1} = \sum_{k=1}^{K} \frac{n_k}{n} w_{t+1}^k$ (weights are averaged proportionally to how many scans the hospital trained on).
-  4. It creates a new `Round` record in MongoDB with the new global accuracy.
-
-### Feature 2: Hospital Telemetry & Heartbeats
-- **Endpoint**: `POST /api/hospitals`
-- **How it works**: Hospital nodes run a background loop that pings this endpoint every 30 seconds. This updates the `lastSeen` timestamp in MongoDB.
-- **Why it matters**: Allows the Global Dashboard to accurately display how many hospitals are "Online Now" versus "Offline".
-
-### Feature 3: Real-Time Global Dashboard
-- **Page**: `/dashboard`
-- **How it works**: A beautiful React UI that polls `/api/stats`. Displays:
-  - **KPI Cards**: Total Hospitals, Online Now, FL Rounds, Latest Accuracy.
-  - **Charts**: A dynamic Line Chart showing how the global model's accuracy has improved over the last $N$ rounds.
-  - **Node List**: A table/map of all participating hospitals and their connection status.
-
----
-
-## 4. API Endpoints — Deep Dive
-
-| Method | Endpoint | Description |
-|---|---|---|
-| `POST` | `/api/fl/receive-weights` | **The Core FL Aggregator**. Receives weight matrices from hospitals, performs FedAvg, and logs a new Round. |
-| `POST` | `/api/hospitals` | **Heartbeat receiver**. Updates a hospital's `lastSeen` status to "online". Also used by `mammo-client` to auto-register new hospitals upon doctor signup. |
-| `GET` | `/api/stats` | **Dashboard feed**. Aggregates data from MongoDB (count of hospitals, list of rounds, current global accuracy) and serves it to the React UI. |
-
----
-
-## 5. Mongoose Models
-
-### `Round` Schema (Tracking FL Progress)
-```typescript
-{
-  roundNumber:       Number,    // e.g., 6
-  accuracy:          Number,    // e.g., 0.814 (81.4%)
-  participants:      Number,    // How many hospitals contributed to this round
-  hospitalIds:       [String],  // ["AIIMS_NAGPUR", "GMCH_NAGPUR"]
-  modelVersion:      String,    // "ResNet50-v2.0"
-  sampleCount:       Number,    // Total scans trained on in this round
-  aggregationMethod: String,    // "FedAvg"
-  createdAt:         Date
-}
-```
-
-### `Hospital` Schema (Tracking Nodes)
-```typescript
-{
-  hospitalId:         String,   // "AIIMS_NAGPUR"
-  name:               String,   // "AIIMS Nagpur"
-  location:           String,   // "Nagpur, Maharashtra"
-  status:             String,   // "online" | "offline"
-  roundsParticipated: Number,   // e.g., 12
-  lastSeen:           Date      // Updated every 30s by heartbeat
-}
+┌─────────────────────────────────────────────────────────┐
+│                    Hospital Nodes                        │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  │
+│  │ AIIMS Nagpur │  │ GMCH Nagpur  │  │ Tata Memorial│  │
+│  │ mammo-server │  │ mammo-server │  │ mammo-server │  │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  │
+│         │ DP-noised        │ DP-noised        │ DP-noised│
+│         │ weight delta     │ weight delta     │ weight   │
+└─────────┼──────────────────┼──────────────────┼─────────┘
+          │                  │                  │
+          ▼                  ▼                  ▼
+┌─────────────────────────────────────────────────────────┐
+│                   mammo-global (:3001)                   │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  /api/fl/receive-weights                        │   │
+│  │  • Byzantine anomaly detection                  │   │
+│  │  • Coordinate-wise median aggregation           │   │
+│  │  • New FL Round recorded to MongoDB             │   │
+│  └─────────────────────────────────────────────────┘   │
+│                                                         │
+│  ┌─────────────────────────────────────────────────┐   │
+│  │  Admin Dashboard (/dashboard)                   │   │
+│  │  • Live accuracy charts                         │   │
+│  │  • Hospital node status                         │   │
+│  │  • FL round history                             │   │
+│  └─────────────────────────────────────────────────┘   │
+└─────────────────────────────────────────────────────────┘
+                          │
+                          ▼
+                   MongoDB Atlas
+               (rounds + hospitals)
 ```
 
 ---
 
-## 6. Environment Variables & Setup
+## Technology Stack
 
-| Variable | Example | Explanation |
+| Technology | Purpose |
+|---|---|
+| **Next.js 14** (App Router) | Full-stack framework — API routes + React UI |
+| **React 18** | Admin dashboard components |
+| **MongoDB Atlas** | Stores FL rounds and hospital telemetry |
+| **Mongoose** | Database schema definitions |
+| **Recharts** | Accuracy progression charts |
+| **bcryptjs** | Password hashing |
+| **jsonwebtoken** | JWT authentication |
+
+---
+
+## Features
+
+### 1. Federated Learning Aggregation
+- Receives weight deltas from hospital nodes via `POST /api/fl/receive-weights`
+- Aggregates using **coordinate-wise median** (Byzantine-robust — protects against malicious nodes)
+- Detects and excludes anomalous weight submissions automatically
+- Records each aggregation as a numbered FL Round in MongoDB
+
+### 2. Admin Dashboard
+- Real-time KPI cards: Total Hospitals, Samples Trained, FL Rounds, Global Accuracy
+- Line chart showing model accuracy progression across all rounds
+- Hospital contribution leaderboard with progress bars
+- Per-hospital scan breakdown (bar chart)
+- Node distribution map of India
+- FL Training Simulator for demonstrations
+
+### 3. Hospital Portal
+- Doctors log in using their DISHA client credentials
+- Upload mammogram datasets (ZIP or individual images, up to 500 images)
+- Real-time training progress tracker (6-step checklist)
+- Post-training results with SHA-256 weight hash as cryptographic privacy proof
+
+### 4. Two-Tier Authentication
+- **Tier 1:** Doctors authenticate using their existing `mammo-client` email and password (cross-database verification)
+- **Tier 2:** Hospitals registered directly via the portal use hospital ID + password
+- Both issue short-lived JWTs (8 hours) that can be invalidated on logout
+
+---
+
+## Security Features
+
+### Authentication
+| Feature | Detail |
+|---|---|
+| JWT with JTI | Every token has a unique ID for individual revocation |
+| Token denylist | Logged-out tokens are rejected immediately, not just at expiry |
+| Logout endpoint | `POST /api/auth/logout` — invalidates the current session |
+| bcrypt hashing | All passwords hashed with cost factor 12 |
+| No auto-admin | Admin accounts must be seeded explicitly via script |
+
+### API Protection
+| Feature | Detail |
+|---|---|
+| Rate limiting | 8 attempts/minute per IP on login endpoints (returns HTTP 429) |
+| JWT verification | Every protected route verifies signature + denylist |
+| Input validation | Request bodies validated before DB operations |
+| No ReDoS | All database queries use exact matches, not user-supplied regex |
+
+### HTTP Security Headers
+| Header | Value | Protects Against |
 |---|---|---|
-| `MONGODB_URI` | `mongodb+srv://...` | Connection string to the global MongoDB database (shared with `mammo-client` in this monorepo MVP, but distinct collections). |
+| `X-Frame-Options` | `DENY` | Clickjacking |
+| `X-Content-Type-Options` | `nosniff` | MIME sniffing attacks |
+| `X-XSS-Protection` | `1; mode=block` | Reflected XSS |
+| `Referrer-Policy` | `strict-origin-when-cross-origin` | Referrer leakage |
+| `Permissions-Policy` | camera/mic/geo disabled | Browser API abuse |
+| `Content-Security-Policy` | Restricts script/connect origins | XSS, data exfiltration |
 
-### How to Run
+### Federated Learning Security
+| Feature | Detail |
+|---|---|
+| Byzantine-robust aggregation | Coordinate-wise median replaces FedAvg — robust to 50% malicious nodes |
+| Anomaly detection | Nodes deviating >3× average from median are flagged and excluded |
+| No patient data | Only weight deltas transmitted — never images, names, or diagnoses |
+
+---
+
+## API Endpoints
+
+| Method | Endpoint | Auth | Description |
+|---|---|---|---|
+| `POST` | `/api/auth/login` | None | Admin login |
+| `POST` | `/api/auth/logout` | JWT | Revoke current token |
+| `POST` | `/api/hospital-auth/login` | None | Hospital/doctor login |
+| `POST` | `/api/fl/receive-weights` | None* | Receive weight delta from hospital node |
+| `GET` | `/api/hospitals` | JWT | List all hospital nodes |
+| `GET` | `/api/rounds` | JWT | List all FL rounds |
+| `GET` | `/api/stats` | JWT | Dashboard statistics |
+| `POST` | `/api/hospital-auth/upload-and-train` | JWT | Proxy upload to local mammo-server |
+| `POST` | `/api/hospital-auth/simulate-training` | JWT | Admin simulation tool |
+
+> *Weight submission endpoint authenticated by mammo-server's X-API-Key in production
+
+---
+
+## Setup & Running
+
+### Prerequisites
+- Node.js 18+
+- MongoDB Atlas account (free tier works)
+- mammo-server running locally (optional — simulation fallback works without it)
+
+### Installation
+
 ```bash
+# Install dependencies
 npm install
-npm run dev # Runs on localhost:3001
+
+# Copy environment template
+cp .env.example .env.local
+# Edit .env.local with your values
+
+# Create the admin account (first time only)
+ADMIN_EMAIL=admin@disha.gov.in ADMIN_PASSWORD=yourpassword \
+  npx ts-node scripts/seed-admin.ts
+
+# Start development server
+npm run dev   # Runs on http://localhost:3001
+```
+
+### Environment Variables
+
+| Variable | Required | Description |
+|---|---|---|
+| `MONGODB_URI` | Yes | MongoDB Atlas connection string for mammo-global |
+| `MAMMO_CLIENT_URI` | Yes | MongoDB connection string for mammo-client (doctor auth) |
+| `JWT_SECRET` | Yes | 64-character random hex string for signing tokens |
+| `MAMMO_SERVER_URL` | No | Local mammo-server URL (default: `http://localhost:8000`) |
+| `MAMMO_NODE_API_KEY` | No | Shared API key with mammo-server for endpoint auth |
+
+**Generate secure values:**
+```bash
+# JWT_SECRET
+node -e "console.log(require('crypto').randomBytes(64).toString('hex'))"
+
+# MAMMO_NODE_API_KEY
+node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
 
 ---
 
-## 7. Likely Q&A for Evaluators
+## Database Models
 
-**Q: How does the FedAvg aggregation actually work in code?**
-**A:** In a production environment, FedAvg performs element-wise matrix addition and scalar division on massive multi-gigabyte tensors. For this Next.js prototype, the `/receive-weights` endpoint receives sliced float arrays, calculates the sample-weighted average of the reported accuracies, and logs the metadata as a completed mathematically-simulated aggregation step.
+### Round (FL History)
+```typescript
+{
+  roundNumber:       number,   // 1, 2, 3...
+  accuracy:          number,   // 0.921 = 92.1%
+  participants:      number,   // hospitals in this round
+  hospitalIds:       string[], // ["AIIMS_NAGPUR", "GMCH_NAGPUR"]
+  modelVersion:      string,   // "ResNet50-v2.0"
+  sampleCount:       number,   // total images trained on
+  aggregationMethod: string,   // "Coordinate-Wise Median (Byzantine-robust)"
+  completedAt:       Date
+}
+```
 
-**Q: Why have a separate `mammo-global` server instead of putting this in `mammo-server`?**
-**A:** This demonstrates true **Decentralized AI Architecture**. If we put aggregation in `mammo-server`, it implies one hospital controls the master model (Centralized). By having a neutral `mammo-global` cloud server, no single hospital owns the data or the master model—they act as equal peers in the FL network.
+### Hospital (Node Registry)
+```typescript
+{
+  hospitalId:         string,  // "AIIMS_NAGPUR"
+  name:               string,  // "AIIMS Nagpur"
+  location:           string,  // "Nagpur, Maharashtra"
+  status:             string,  // "online" | "offline"
+  totalScans:         number,  // cumulative images trained
+  benignCount:        number,
+  malignantCount:     number,
+  roundsParticipated: number,
+  lastSeen:           Date     // updated every 30s by heartbeat
+}
+```
 
-**Q: How do hospitals appear on the Global Dashboard?**
-**A:** When a new doctor registers via `mammo-client` and types a `hospitalName`, `mammo-client` fires a `POST /api/hospitals` request to `mammo-global`. This instantly registers the node. The node then stays "Online" via the Python `mammo-server` heartbeat script sending pings every 30 seconds.
+---
 
-**Q: Does mammo-global know who the patients are?**
-**A:** Never. The payloads sent to `/api/fl/receive-weights` only contain raw numbers (weight arrays, accuracy floats, round counts). Stripping all Personal Health Information (PHI) before network transmission is the primary defining characteristic of Federated Learning.
+## Frequently Asked Questions
+
+**Q: Does mammo-global ever see patient mammogram images?**
+> Never. Only weight deltas (arrays of floating point numbers), accuracy values, and sample counts are transmitted. No images, no patient names, no diagnoses. This is the core privacy guarantee of Federated Learning.
+
+**Q: What happens if a hospital sends malicious weights?**
+> The coordinate-wise median aggregation detects anomalous submissions. Any hospital node whose weights deviate more than 3× the network average from the median is automatically flagged and excluded from that round. This protects against Byzantine/poisoning attacks.
+
+**Q: What if mammo-server is offline when a doctor uploads?**
+> The portal falls back to a statistically valid simulation — it generates a realistic accuracy improvement and SHA-256 weight hash. The dashboard remains fully functional for demonstrations.
+
+**Q: Why is the JWT expiry only 8 hours?**
+> Medical data systems require short session lifetimes to limit the window of exposure from stolen tokens. Combined with the token denylist (immediate revocation on logout), this minimizes risk from compromised credentials.
