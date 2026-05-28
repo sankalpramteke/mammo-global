@@ -5,8 +5,8 @@ const JWT_SECRET = process.env.JWT_SECRET;
 
 export interface AdminPayload {
   adminId: string;
-  email:   string;
-  jti?:    string;
+  email: string;
+  jti?: string;
 }
 
 export function verifyToken(authHeader: string | null): AdminPayload | null {

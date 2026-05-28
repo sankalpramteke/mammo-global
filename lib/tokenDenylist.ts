@@ -28,7 +28,7 @@ export function isDenied(jti: string): boolean {
 /** Remove expired entries to prevent unbounded memory growth. */
 function _prune(): void {
   const now = Date.now();
-  for (const [jti, expiry] of _denylist) {
+  Array.from(_denylist.entries()).forEach(([jti, expiry]) => {
     if (now > expiry) _denylist.delete(jti);
-  }
+  });
 }

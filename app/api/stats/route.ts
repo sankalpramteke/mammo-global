@@ -9,7 +9,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   await connectDB();
-  
+
   // Aggregate stats across all hospitals
   const result = await Hospital.aggregate([
     {
@@ -21,9 +21,9 @@ export async function GET(req: NextRequest) {
       }
     }
   ]);
-  
+
   const stats = result[0] || { totalScans: 0, totalBenign: 0, totalMalignant: 0 };
-  
+
   // Get recent activity feed (last 10 rounds)
   const recentRounds = await Round.find()
     .sort({ completedAt: -1 })

@@ -166,7 +166,8 @@ export default function HospitalPortalPage() {
     // Fetch privacy audit log from mammo-server (proof for evaluator)
     if (!data.simulation) {
       try {
-        const auditRes = await fetch('http://localhost:8000/training-audit');
+        const mammoServer = process.env.NEXT_PUBLIC_MAMMO_SERVER_URL || 'http://localhost:8000';
+        const auditRes = await fetch(`${mammoServer}/training-audit`);
         if (auditRes.ok) setAudit((await auditRes.json()).last_training ?? null);
       } catch { /* mammo-server offline */ }
     }
@@ -485,7 +486,7 @@ export default function HospitalPortalPage() {
             <div style={{ padding: '12px 16px' }}>
               <div style={{ padding: '10px 14px', background: '#f8fafc', border: '1px solid #e2e8f0', borderRadius: 8, marginBottom: 10 }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: '#374151', marginBottom: 4 }}>Start the training server:</div>
-                <code style={{ fontSize: 11.5, color: '#0f172a', background: '#1e293b', color: '#a5f3fc', padding: '8px 12px', borderRadius: 6, display: 'block', lineHeight: 1.8 }}>
+                <code style={{ fontSize: 11.5, background: '#1e293b', color: '#a5f3fc', padding: '8px 12px', borderRadius: 6, display: 'block', lineHeight: 1.8 }}>
                   cd mammo-server<br />
                   python -m uvicorn main:app --port 8000
                 </code>

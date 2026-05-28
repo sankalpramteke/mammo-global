@@ -30,10 +30,10 @@ export async function POST(req: NextRequest) {
 
   const hospital = await Hospital.findOneAndUpdate(
     { hospitalId },
-    { 
-      name, 
-      location: location || 'India', 
-      lastSeen: new Date(), 
+    {
+      name,
+      location: location || 'India',
+      lastSeen: new Date(),
       status: 'online',
       $setOnInsert: { // Only set these on first creation
         lat: sampleLat,

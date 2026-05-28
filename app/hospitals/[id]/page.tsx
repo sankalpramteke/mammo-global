@@ -88,7 +88,7 @@ export default function HospitalDetailPage() {
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                   <XAxis dataKey="round" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                   <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                  <Tooltip formatter={(v: number) => [`${v}%`, 'Accuracy']} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                  <Tooltip formatter={(v: unknown) => [`${v}%`, 'Accuracy']} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
                   <Line type="monotone" dataKey="accuracy" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 4, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 6 }} animationDuration={800} />
                 </LineChart>
               </ResponsiveContainer>
@@ -103,7 +103,7 @@ export default function HospitalDetailPage() {
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={2} dataKey="value" stroke="none">
                   {pieData.map((_, i) => <Cell key={i} fill={['#16a34a', '#dc2626', '#e2e8f0'][i]} />)}
                 </Pie>
-                <Tooltip formatter={(v: number) => [v, 'Scans']} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                <Tooltip formatter={(v: unknown) => [String(v), 'Scans']} contentStyle={{ borderRadius: 8, border: '1px solid #e2e8f0', fontSize: 12 }} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>

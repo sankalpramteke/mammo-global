@@ -17,7 +17,7 @@ interface Hospital { _id: string; hospitalId: string; name: string; status: stri
 interface Stats { totalScans: number; totalBenign: number; totalMalignant: number; }
 
 /* ── KPI Card ────────────────────────────────────────────────────────────── */
-function KPICard({ label, value, sub, accent, icon, delta }: { label: string; value: string | number; sub: string; accent: string; icon: string; delta?: string | null }) {
+function KPICard({ label, value, sub, accent, icon, delta }: { label: string; value: string | number; sub: string; accent: string; icon: React.ReactNode; delta?: string | null }) {
   const isPos = delta && !delta.startsWith('-');
   return (
     <div className="card" style={{ padding: 20 }}>
@@ -164,7 +164,7 @@ export default function DashboardPage() {
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
                     <XAxis dataKey="round" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                     <YAxis domain={[0, 100]} unit="%" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                    <Tooltip formatter={(v: number) => [`${v}%`, 'Accuracy']} contentStyle={tooltipStyle} />
+                    <Tooltip formatter={(v: unknown) => [`${v}%`, 'Accuracy']} contentStyle={tooltipStyle} />
                     <Line type="monotone" dataKey="accuracy" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3.5, fill: '#f59e0b', strokeWidth: 0 }} activeDot={{ r: 5 }} animationDuration={600} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -329,7 +329,7 @@ export default function DashboardPage() {
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={46} outerRadius={64} paddingAngle={2} dataKey="value" stroke="none">
                   {pieData.map((_, i) => <Cell key={i} fill={['#16a34a', '#dc2626', '#e2e8f0'][i]} />)}
                 </Pie>
-                <Tooltip formatter={(v: number) => [v.toLocaleString(), 'Scans']} contentStyle={tooltipStyle} />
+                <Tooltip formatter={(v: unknown) => [typeof v === 'number' ? v.toLocaleString() : String(v), 'Scans']} contentStyle={tooltipStyle} />
                 <Legend iconType="circle" wrapperStyle={{ fontSize: 11.5 }} />
               </PieChart>
             </ResponsiveContainer>

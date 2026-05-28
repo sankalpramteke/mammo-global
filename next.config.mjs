@@ -1,5 +1,12 @@
 /** @type {import('next').NextConfig} */
 
+// Support both local dev (localhost:8000) and deployed mammo-server (any https URL)
+const mammoServerUrl = process.env.MAMMO_SERVER_URL || 'http://localhost:8000';
+// Extract origin only (strip path) for CSP
+const mammoServerOrigin = (() => {
+  try { return new URL(mammoServerUrl).origin; } catch { return mammoServerUrl; }
+})();
+
 const securityHeaders = [
   // Prevents page from being embedded in iframes (clickjacking)
   { key: 'X-Frame-Options',        value: 'DENY' },
@@ -21,7 +28,8 @@ const securityHeaders = [
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: blob:",
-      "connect-src 'self' http://localhost:8000",          // mammo-server API calls
+      // Allow mammo-server API calls (localhost in dev, deployed URL in prod)
+      `connect-src 'self' http://localhost:8000 ${mammoServerOrigin}`,
       "frame-ancestors 'none'",
       "base-uri 'self'",
       "form-action 'self'",
@@ -42,3 +50,4 @@ const nextConfig = {
 };
 
 export default nextConfig;
+
