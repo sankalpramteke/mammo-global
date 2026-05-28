@@ -9,7 +9,6 @@ const JWT_SECRET      = process.env.JWT_SECRET;
 const MAMMO_SERVER    = process.env.MAMMO_SERVER_URL  || 'http://localhost:8000';
 const NODE_API_KEY    = process.env.MAMMO_NODE_API_KEY || '';
 
-export const config = { api: { bodyParser: false } };
 
 /**
  * POST /api/hospital-auth/upload-and-train
